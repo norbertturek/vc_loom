@@ -44,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, toRefs } from 'vue'
 import { Button } from '@/components/ui/button'
 import { useScreenRecorder } from '../composables/useScreenRecorder'
 import RecordingSettings from './RecordingSettings.vue'
@@ -59,18 +59,17 @@ const includeWebcam = ref(true)
 const includeAudio = ref(true)
 
 const {
-  isRecording,
-  recordedVideo,
-  error,
+  state,
   deviceState,
   webcamStream,
   getDevices,
   startWebcamPreview,
   startRecording: startRec,
   stopRecording,
-  cleanup,
-  isLoading
+  cleanup
 } = useScreenRecorder()
+
+const { isRecording, recordedVideo, error, isLoading } = toRefs(state.value)
 
 async function handleDeviceSetup() {
   await getDevices()

@@ -3,9 +3,7 @@ import ScreenRecorder from '@/features/screen-recorder/components/ScreenRecorder
 </script>
 
 <template>
-  <div class="min-h-screen bg-background text-foreground">
-    <ScreenRecorder />
-  </div>
+  <router-view></router-view>
 </template>
 
 <style>

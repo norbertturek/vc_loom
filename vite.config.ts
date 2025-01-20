@@ -17,17 +17,25 @@ export default defineConfig({
     assetsDir: 'assets',
     sourcemap: false,
     minify: 'terser',
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks: {
-          'vue-vendor': ['vue'],
+          'vue-vendor': ['vue', 'vue-router'],
           'ui-vendor': [
             '@vueuse/core',
             'radix-vue',
-            'lucide-vue-next'
+            'lucide-vue-next',
+            'class-variance-authority',
+            'clsx',
+            'tailwind-merge'
           ]
         }
       }
     }
+  },
+  server: {
+    port: 5173,
+    strictPort: true
   }
 })

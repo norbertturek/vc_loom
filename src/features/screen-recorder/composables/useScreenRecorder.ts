@@ -126,10 +126,12 @@ export function useScreenRecorder() {
       state.value.isLoading = true
       state.value.error = null
       state.value.recordedVideo = null
+      state.value.isRecording = false
 
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: true
       }).catch(() => {
+        state.value.isLoading = false
         throw new Error('Screen sharing was cancelled')
       })
 
@@ -231,7 +233,7 @@ export function useScreenRecorder() {
   }
 
   return {
-    ...state.value,
+    state,
     deviceState,
     webcamStream,
     getDevices,
