@@ -20,7 +20,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { supabase } from '@/features/auth/lib/supabase'
+import { getSupabase } from '@/features/auth/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -28,6 +28,7 @@ const router = useRouter()
 const route = useRoute()
 
 onMounted(async () => {
+  const supabase = getSupabase()
   // Handle the hash fragment
   const hashParams = new URLSearchParams(window.location.hash.substring(1))
   const accessToken = hashParams.get('access_token')

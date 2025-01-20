@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { supabase } from '../lib/supabase'
+import { getSupabase } from '../lib/supabase'
 import type { AuthState, SignUpData, SignInData } from '../types'
 
 // Create shared reactive state
@@ -12,6 +12,7 @@ const state = ref<AuthState>({
 
 export function useAuth() {
   const router = useRouter()
+  const supabase = getSupabase()
 
   // Computed properties to access state
   const user = computed(() => state.value.user)

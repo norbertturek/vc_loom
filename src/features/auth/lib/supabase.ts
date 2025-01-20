@@ -17,10 +17,7 @@ const supabaseInstance = createClient<Database>(supabaseUrl, supabaseKey, {
   }
 })
 
-// Export a function to get the instance
+// Export only the function to get the instance
 export function getSupabase() {
   return supabaseInstance
-}
-
-// For backward compatibility
-export const supabase = supabaseInstance 
+} 
