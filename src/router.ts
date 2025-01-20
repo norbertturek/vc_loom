@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { supabase } from '@/features/auth/lib/supabase'
+import { getSupabase } from '@/features/auth/lib/supabase'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -44,6 +44,8 @@ const router = createRouter({
 
 // Navigation guards
 router.beforeEach(async (to) => {
+  const supabase = getSupabase()
+  
   // Handle confirmation hash
   if (window.location.hash.includes('access_token') && to.name !== 'confirmation') {
     return { name: 'confirmation' }
