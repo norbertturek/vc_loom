@@ -1,7 +1,9 @@
 <template>
   <div class="screen-recorder">
     <ErrorAlert :error="error" />
-    <LoadingSpinner :is-loading="isLoading" />
+    <div v-if="isLoading" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <Loader2 class="h-12 w-12 animate-spin text-white" />
+    </div>
 
     <RecordingSettings
       v-model:webcam="selectedWebcam"
@@ -46,12 +48,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, toRefs } from 'vue'
 import { Button } from '@/components/ui/button'
+import { AlertCircle, Loader2 } from 'lucide-vue-next'
 import { useScreenRecorder } from '../composables/useScreenRecorder'
 import RecordingSettings from './RecordingSettings.vue'
 import WebcamPreview from './WebcamPreview.vue'
 import RecordingPreview from './RecordingPreview.vue'
 import ErrorAlert from './ErrorAlert.vue'
-import LoadingSpinner from './LoadingSpinner.vue'
 
 const selectedWebcam = ref('')
 const selectedMicrophone = ref('')

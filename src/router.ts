@@ -1,32 +1,40 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import MainLayout from './layouts/MainLayout.vue'
-import HomePage from './pages/HomePage.vue'
-import LoginPage from './pages/LoginPage.vue'
-import RegisterPage from './pages/RegisterPage.vue'
-import RecorderPage from './pages/RecorderPage.vue'
+import { supabase } from '@/features/auth/lib/supabase'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
       path: '/',
-      component: MainLayout,
+      component: () => import('@/layouts/MainLayout.vue'),
       children: [
         {
           path: '',
-          component: HomePage
+          name: 'home',
+          component: () => import('@/pages/HomePage.vue')
         },
         {
           path: 'login',
-          component: LoginPage
+          name: 'login',
+          component: () => import('@/pages/LoginPage.vue'),
+          meta: { requiresGuest: true }
         },
         {
           path: 'register',
-          component: RegisterPage
+          name: 'register',
+          component: () => import('@/pages/RegisterPage.vue'),
+          meta: { requiresGuest: true }
+        },
+        {
+          path: 'confirmation',
+          name: 'confirmation',
+          component: () => import('@/pages/ConfirmationPage.vue'),
+          meta: { requiresGuest: true }
         },
         {
           path: 'recorder',
-          component: RecorderPage,
+          name: 'recorder',
+          component: () => import('@/pages/RecorderPage.vue'),
           meta: { requiresAuth: true }
         }
       ]
@@ -34,15 +42,36 @@ const router = createRouter({
   ]
 })
 
-// Simple auth guard
-router.beforeEach((to, from, next) => {
-  // Mock auth check - replace with actual auth logic
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true'
-  
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    next('/login')
-  } else {
-    next()
+// Navigation guards
+router.beforeEach(async (to) => {
+  // Handle confirmation hash
+  if (window.location.hash.includes('access_token') && to.name !== 'confirmation') {
+    return { name: 'confirmation' }
+  }
+
+  try {
+    // Check auth state
+    const { data: { session }, error } = await supabase.auth.getSession()
+    
+    // Handle auth errors
+    if (error) {
+      console.error('Auth error:', error)
+      await supabase.auth.signOut()
+      return { name: 'login' }
+    }
+
+    // Routes that require authentication
+    if (to.meta.requiresAuth && !session) {
+      return { name: 'login' }
+    }
+    
+    // Routes that require guest (non-authenticated) access
+    if (to.meta.requiresGuest && session) {
+      return { name: 'recorder' }
+    }
+  } catch (error) {
+    console.error('Navigation error:', error)
+    return { name: 'login' }
   }
 })
 

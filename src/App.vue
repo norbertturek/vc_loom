@@ -1,25 +1,34 @@
 <script setup lang="ts">
-import ScreenRecorder from '@/features/screen-recorder/components/ScreenRecorder.vue'
+import { onMounted, computed } from 'vue'
+import { Loader2 } from 'lucide-vue-next'
+import { useAuth } from '@/features/auth/composables/useAuth'
+import { useRouter, useRoute } from 'vue-router'
+
+const { getUser, loading, user } = useAuth()
+const router = useRouter()
+const route = useRoute()
+
+const showLoader = computed(() => {
+  return loading.value && route.meta.requiresAuth && !user.value
+})
+
+onMounted(async () => {
+  try {
+    await getUser()
+  } catch (error) {
+    console.error('Auth initialization error:', error)
+  }
+})
 </script>
 
 <template>
-  <router-view></router-view>
+  <router-view v-if="!showLoader" />
+  <div v-else class="flex items-center justify-center min-h-screen">
+    <Loader2 class="h-8 w-8 animate-spin" />
+  </div>
 </template>
 
 <style>
-.app {
-  font-family: system-ui, -apple-system, sans-serif;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-h1 {
-  color: #1f2937;
-  margin-bottom: 2rem;
-}
-
 body {
   margin: 0;
   background-color: #f3f4f6;

@@ -1,23 +1,48 @@
 # Screen Recorder
 
-A Vue 3 screen recording application with webcam overlay support.
+A modern screen recording application with webcam overlay support and authentication.
 
 ## Features
 
-- Screen recording with webcam picture-in-picture
-- Device selection for webcam and microphone
-- Modern UI with shadcn-vue components
-- Real-time webcam preview
+- Screen recording with webcam overlay
+- Device selection (webcam and microphone)
+- Modern UI with Tailwind CSS
+- Real-time preview
 - Error handling and loading states
 - TypeScript support
+- Authentication with Supabase
+
+## Authentication
+
+### Demo Credentials
+- Email: `demo@example.com`
+- Password: `password`
+
+### Registration
+1. Click "Get Started" or navigate to `/register`
+2. Enter your email and password (minimum 6 characters)
+3. Click "Create account"
+4. Check your email for the confirmation link
+5. Click the confirmation link to activate your account
+
+### Login
+1. Navigate to `/login`
+2. Enter your email and password
+3. Click "Sign in"
+4. You'll be redirected to the recorder page
+
+### Protected Routes
+- The recorder page (`/recorder`) requires authentication
+- Unauthenticated users will be redirected to login
+- Authenticated users will be redirected from auth pages to recorder
 
 ## Tech Stack
 
 - Vue 3 with Composition API
 - TypeScript
 - Tailwind CSS
-- shadcn-vue for UI components
-- MediaRecorder API for recording
+- Supabase for authentication
+- MediaRecorder API
 - Canvas API for webcam overlay
 
 ## Getting Started

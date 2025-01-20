@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { fileURLToPath, URL } from 'url'
+import { fileURLToPath, URL } from 'node:url'
 
-// https://vite.dev/config/
+// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [vue()],
   resolve: {
@@ -12,24 +12,20 @@ export default defineConfig({
     }
   },
   build: {
-    target: 'es2015',
+    // Production optimizations
+    target: 'esnext',
+    minify: 'terser',
+    cssMinify: true,
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
-    minify: 'terser',
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks: {
           'vue-vendor': ['vue', 'vue-router'],
-          'ui-vendor': [
-            '@vueuse/core',
-            'radix-vue',
-            'lucide-vue-next',
-            'class-variance-authority',
-            'clsx',
-            'tailwind-merge'
-          ]
+          'ui-vendor': ['@headlessui/vue', '@heroicons/vue', 'lucide-vue-next'],
+          'auth-vendor': ['@supabase/supabase-js']
         }
       }
     }
@@ -37,5 +33,8 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true
+  },
+  optimizeDeps: {
+    include: ['vue', 'vue-router', '@supabase/supabase-js']
   }
 })

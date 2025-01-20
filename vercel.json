@@ -1,9 +1,9 @@
 {
   "framework": "vite",
-  "buildCommand": "yarn build",
+  "buildCommand": "bun run build",
   "outputDirectory": "dist",
-  "installCommand": "yarn install",
-  "devCommand": "yarn dev",
+  "installCommand": "bun install",
+  "devCommand": "bun run dev",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
@@ -16,12 +16,29 @@
           "value": "nosniff"
         },
         {
-          "key": "X-Frame-Options", 
+          "key": "X-Frame-Options",
           "value": "DENY"
         },
         {
           "key": "X-XSS-Protection",
           "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=self, microphone=self"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
         }
       ]
     }
