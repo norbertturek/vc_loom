@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import supabase from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import type { AuthState, SignUpData, SignInData } from '../types'
 
 // Create shared reactive state

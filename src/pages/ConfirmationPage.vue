@@ -20,7 +20,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import supabase from '@/features/auth/lib/supabase'
+import { supabase } from '@/features/auth/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
