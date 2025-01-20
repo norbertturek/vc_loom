@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { supabase } from '@/features/auth/lib/supabase'
+import supabase from '@/features/auth/lib/supabase'
 
 const router = createRouter({
   history: createWebHistory(),
