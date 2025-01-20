@@ -213,10 +213,21 @@ export function useScreenRecorder() {
   function cleanup(): void {
     if (webcamStream.value) {
       webcamStream.value.getTracks().forEach(track => track.stop())
+      webcamStream.value = null
+    }
+    if (mediaRecorder.value) {
+      if (mediaRecorder.value.state !== 'inactive') {
+        mediaRecorder.value.stop()
+      }
+      mediaRecorder.value = null
     }
     if (state.value.recordedVideo) {
       URL.revokeObjectURL(state.value.recordedVideo)
+      state.value.recordedVideo = null
     }
+    recordedChunks.value = []
+    state.value.isRecording = false
+    state.value.error = null
   }
 
   return {
