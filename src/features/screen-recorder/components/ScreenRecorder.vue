@@ -111,14 +111,16 @@ async function startRecording() {
 
 async function handleStopRecording() {
   try {
-    const { blob, transcripts } = await stopRecording()
+    const { blob, transcripts, videoUrl } = await stopRecording()
     const title = `Recording ${new Date().toLocaleString()}`
-    const recordingId = await uploadRecording(blob, title, transcripts)
     
-    // Navigate to video player
-    router.push(`/video/${recordingId}`)
-  } catch (err) {
-    console.error('Error stopping recording:', err)
+    // Upload the recording
+    const recordingId = await uploadRecording(blob, title, transcripts)
+
+    // Open video in new tab
+    window.open(`/video/${recordingId}`, '_blank')
+  } catch (error) {
+    console.error('Failed to stop recording:', error)
   }
 }
 

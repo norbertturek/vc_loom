@@ -3,7 +3,7 @@ import { getSupabase } from '@/features/auth/lib/supabase'
 import type { Comment, Transcription, ShareLink } from '@/types/database'
 import { useToast } from '@/components/ui/toast/use-toast'
 
-export function useVideoPlayer(recordingId: string) {
+export function useVideoPlayer(videoId: string) {
   const supabase = getSupabase()
   const { toast } = useToast()
 
@@ -13,6 +13,7 @@ export function useVideoPlayer(recordingId: string) {
   const transcription = ref<Transcription[]>([])
   const videoUrl = ref<string | null>(null)
   const shareLink = ref<string | null>(null)
+  const title = ref<string>('')
 
   const sortedComments = computed(() => {
     return [...comments.value].sort((a, b) => a.timestamp - b.timestamp)
@@ -22,55 +23,49 @@ export function useVideoPlayer(recordingId: string) {
     try {
       isLoading.value = true
       error.value = null
-
-      const { data: recording, error: recordingError } = await supabase
+      const { data, error: err } = await supabase
         .from('recordings')
-        .select('*')
-        .eq('id', recordingId)
+        .select('url, title, transcriptions(*), comments(*)')
+        .eq('id', videoId)
         .single()
 
-      if (recordingError) throw recordingError
-      if (!recording) throw new Error('Recording not found')
+      if (err) throw err
+      if (!data) throw new Error('Recording not found')
 
-      videoUrl.value = recording.url
-
-      await Promise.all([
-        fetchComments(),
-        fetchTranscription()
-      ])
+      videoUrl.value = data.url
+      title.value = data.title || 'Untitled Recording'
+      
+      // Convert timestamps from milliseconds to seconds and ensure they're properly formatted
+      transcription.value = (data.transcriptions || []).map(t => ({
+        ...t,
+        start_time: Math.round(t.start_time / 1000), // Convert ms to seconds
+        end_time: Math.round(t.end_time / 1000)     // Convert ms to seconds
+      }))
+      
+      // Convert comment timestamps from milliseconds to seconds
+      comments.value = (data.comments || []).map(c => ({
+        ...c,
+        timestamp: Math.round(c.timestamp / 1000) // Convert ms to seconds
+      }))
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to load video'
-      toast({
-        title: 'Error',
-        description: error.value,
-        variant: 'destructive'
-      })
+      error.value = err instanceof Error ? err.message : 'Failed to fetch video'
+      console.error('Error fetching video:', err)
     } finally {
       isLoading.value = false
     }
   }
 
-  async function fetchComments() {
+  async function updateTitle(newTitle: string) {
     try {
-      const { data, error: commentsError } = await supabase
-        .from('comments')
-        .select('*')
-        .eq('recording_id', recordingId)
-        .order('timestamp')
+      const { error: err } = await supabase
+        .from('recordings')
+        .update({ title: newTitle })
+        .eq('id', videoId)
 
-      if (commentsError) throw commentsError
-      
-      // Convert timestamps from milliseconds to seconds
-      comments.value = data.map(comment => ({
-        ...comment,
-        timestamp: Math.round(comment.timestamp) / 1000 // Ensure we're dealing with whole milliseconds
-      }))
+      if (err) throw err
+      title.value = newTitle
     } catch (err) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load comments',
-        variant: 'destructive'
-      })
+      throw new Error(err instanceof Error ? err.message : 'Failed to update title')
     }
   }
 
@@ -86,7 +81,7 @@ export function useVideoPlayer(recordingId: string) {
       const { data, error: commentError } = await supabase
         .from('comments')
         .insert({
-          recording_id: recordingId,
+          recording_id: videoId,
           user_id: user.id,
           text,
           timestamp: timestampMs,
@@ -138,12 +133,12 @@ export function useVideoPlayer(recordingId: string) {
 
   async function fetchTranscription() {
     try {
-      console.log('Fetching transcriptions for recording:', recordingId)
+      console.log('Fetching transcriptions for recording:', videoId)
       
       const { data, error: transcriptionError } = await supabase
         .from('transcriptions')
         .select('*')
-        .eq('recording_id', recordingId)
+        .eq('recording_id', videoId)
         .order('start_time')
 
       if (transcriptionError) {
@@ -177,7 +172,7 @@ export function useVideoPlayer(recordingId: string) {
       const { data: existingLink } = await supabase
         .from('share_links')
         .select('token')
-        .eq('recording_id', recordingId)
+        .eq('recording_id', videoId)
         .gt('expires_at', new Date().toISOString())
         .maybeSingle()
 
@@ -190,7 +185,7 @@ export function useVideoPlayer(recordingId: string) {
       const { data, error: shareError } = await supabase
         .from('share_links')
         .insert({
-          recording_id: recordingId,
+          recording_id: videoId,
           token: crypto.randomUUID(),
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
         })
@@ -217,9 +212,11 @@ export function useVideoPlayer(recordingId: string) {
     comments: sortedComments,
     transcription,
     shareLink,
+    title,
     fetchVideoData,
     addComment,
     deleteComment,
-    generateShareLink
+    generateShareLink,
+    updateTitle
   }
 } 

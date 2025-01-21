@@ -124,7 +124,7 @@ export function useScreenRecorder() {
 
   async function createCanvasStream(screenStream: MediaStream, webcamStream: MediaStream): Promise<MediaStream> {
     const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true })
     
     const screenTrack = screenStream.getVideoTracks()[0]
     const { width, height } = screenTrack.getSettings()
@@ -142,38 +142,61 @@ export function useScreenRecorder() {
     const pipWidth = canvas.width * 0.2
     const pipHeight = (pipWidth * 3) / 4
 
-    function drawFrame() {
+    let lastDrawTime = 0
+    const targetFPS = 30
+    const frameInterval = 1000 / targetFPS
+
+    function drawFrame(timestamp: number) {
       if (!ctx) return
       
-      ctx.drawImage(screenVideo, 0, 0, canvas.width, canvas.height)
-      ctx.save()
+      // Implement frame rate limiting
+      const elapsed = timestamp - lastDrawTime
+      if (elapsed < frameInterval) {
+        requestAnimationFrame(drawFrame)
+        return
+      }
       
-      const padding = 20
-      const x = canvas.width - pipWidth - padding
-      const y = canvas.height - pipHeight - padding
-      const borderRadius = 16
+      lastDrawTime = timestamp
+
+      // Clear the canvas before drawing new frame
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
       
-      ctx.beginPath()
-      ctx.moveTo(x + borderRadius, y)
-      ctx.lineTo(x + pipWidth - borderRadius, y)
-      ctx.quadraticCurveTo(x + pipWidth, y, x + pipWidth, y + borderRadius)
-      ctx.lineTo(x + pipWidth, y + pipHeight - borderRadius)
-      ctx.quadraticCurveTo(x + pipWidth, y + pipHeight, x + pipWidth - borderRadius, y + pipHeight)
-      ctx.lineTo(x + borderRadius, y + pipHeight)
-      ctx.quadraticCurveTo(x, y + pipHeight, x, y + pipHeight - borderRadius)
-      ctx.lineTo(x, y + borderRadius)
-      ctx.quadraticCurveTo(x + borderRadius, y, x + borderRadius, y)
-      ctx.closePath()
+      // Draw screen content
+      if (!screenVideo.paused && !screenVideo.ended) {
+        ctx.drawImage(screenVideo, 0, 0, canvas.width, canvas.height)
+      }
       
-      ctx.clip()
-      ctx.drawImage(webcamVideo, x, y, pipWidth, pipHeight)
-      ctx.restore()
+      // Draw webcam PiP
+      if (!webcamVideo.paused && !webcamVideo.ended) {
+        ctx.save()
+        
+        const padding = 20
+        const x = canvas.width - pipWidth - padding
+        const y = canvas.height - pipHeight - padding
+        const borderRadius = 16
+        
+        ctx.beginPath()
+        ctx.moveTo(x + borderRadius, y)
+        ctx.lineTo(x + pipWidth - borderRadius, y)
+        ctx.quadraticCurveTo(x + pipWidth, y, x + pipWidth, y + borderRadius)
+        ctx.lineTo(x + pipWidth, y + pipHeight - borderRadius)
+        ctx.quadraticCurveTo(x + pipWidth, y + pipHeight, x + pipWidth - borderRadius, y + pipHeight)
+        ctx.lineTo(x + borderRadius, y + pipHeight)
+        ctx.quadraticCurveTo(x, y + pipHeight, x, y + pipHeight - borderRadius)
+        ctx.lineTo(x, y + borderRadius)
+        ctx.quadraticCurveTo(x + borderRadius, y, x + borderRadius, y)
+        ctx.closePath()
+        
+        ctx.clip()
+        ctx.drawImage(webcamVideo, x, y, pipWidth, pipHeight)
+        ctx.restore()
+      }
       
       requestAnimationFrame(drawFrame)
     }
 
-    drawFrame()
-    return canvas.captureStream(30)
+    requestAnimationFrame(drawFrame)
+    return canvas.captureStream(targetFPS)
   }
 
   async function startRecording(options: RecordingOptions): Promise<void> {
@@ -354,7 +377,7 @@ export function useScreenRecorder() {
     }
   }
 
-  function stopRecording(): Promise<{ blob: Blob, transcripts: typeof transcripts.value }> {
+  function stopRecording(): Promise<{ blob: Blob, transcripts: typeof transcripts.value, videoUrl: string }> {
     return new Promise((resolve, reject) => {
       if (!mediaRecorder.value || !state.value.isRecording) {
         reject(new Error('No active recording'))
@@ -367,7 +390,8 @@ export function useScreenRecorder() {
           if (state.value.recordedVideo) {
             URL.revokeObjectURL(state.value.recordedVideo)
           }
-          state.value.recordedVideo = URL.createObjectURL(blob)
+          const videoUrl = URL.createObjectURL(blob)
+          state.value.recordedVideo = videoUrl
           state.value.isRecording = false
           
           // Stop all tracks except webcam
@@ -376,7 +400,7 @@ export function useScreenRecorder() {
             .forEach(track => track.stop())
           
           recordedChunks.value = []
-          resolve({ blob, transcripts: transcripts.value })
+          resolve({ blob, transcripts: transcripts.value, videoUrl })
         } catch (err) {
           console.error('Error processing recording:', err)
           state.value.error = 'Failed to process recording'

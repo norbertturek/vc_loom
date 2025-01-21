@@ -3,18 +3,73 @@
     <div class="grid grid-cols-[2fr,1fr] gap-6 max-w-[1600px] mx-auto p-6">
       <!-- Left column: Video -->
       <div class="space-y-6">
-        <div class="relative aspect-video bg-black rounded-lg overflow-hidden">
+        <!-- Video Title and Duration -->
+        <div class="flex items-center gap-4">
+          <div class="flex-1">
+            <Input
+              v-if="isEditingTitle"
+              v-model="editedTitle"
+              class="text-2xl font-bold w-full"
+              @keyup.enter="saveVideoTitle"
+              @blur="saveVideoTitle"
+              ref="titleInputRef"
+            />
+            <h1 
+              v-else 
+              class="text-2xl font-bold cursor-pointer hover:text-blue-600"
+              @click="startEditingTitle"
+            >
+              {{ videoTitle || 'Untitled Recording' }}
+            </h1>
+            <p v-if="duration" class="text-sm text-gray-500 mt-1">
+              Duration: {{ formatTime(duration) }}
+            </p>
+          </div>
+          <Button v-if="!isEditingTitle" @click="startEditingTitle" variant="ghost" size="sm">
+            <PencilIcon class="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div class="relative aspect-video bg-black rounded-lg overflow-hidden group">
           <video
             ref="videoRef"
             :src="videoSrc"
             class="w-full h-full"
             controls
             @timeupdate="handleTimeUpdate"
-          />
-          <VideoCaptions
-            :transcription="transcription"
-            :current-time="currentTime"
-          />
+            @loadedmetadata="handleVideoLoaded"
+            preload="auto"
+            crossorigin="anonymous"
+            playsinline
+          >
+            <source :src="videoSrc" type="video/webm">
+            Your browser does not support the video tag.
+          </video>
+          
+          <!-- Custom Progress Bar -->
+          <div 
+            ref="progressBarRef"
+            class="absolute bottom-0 left-0 right-0 h-1 bg-gray-200 cursor-pointer"
+            @click="handleProgressBarClick"
+          >
+            <div 
+              class="h-full bg-blue-600 transition-all duration-100"
+              :style="{ width: `${(currentTime / (duration || 1)) * 100}%` }"
+            />
+          </div>
+          
+          <!-- Video Captions -->
+          <div 
+            v-if="currentTranscript"
+            class="absolute bottom-16 left-0 right-0 flex justify-center px-4 video-captions"
+          >
+            <div 
+              class="bg-black/75 text-white px-4 py-2 rounded-lg text-lg max-w-[80%] text-center"
+              :class="{ 'opacity-75': currentTranscript.interim }"
+            >
+              {{ currentTranscript.text }}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -135,24 +190,11 @@
         </DialogFooter>
       </DialogContent>
     </Dialog>
-
-    <!-- Real-time captions overlay -->
-    <div 
-      v-if="currentTranscript"
-      class="absolute bottom-16 left-0 right-0 flex justify-center"
-    >
-      <div 
-        class="bg-black/75 text-white px-4 py-2 rounded-lg text-lg max-w-[80%] text-center"
-        :class="{ 'opacity-75': currentTranscript.interim }"
-      >
-        {{ currentTranscript.text }}
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { useVideoPlayer } from '@/features/screen-recorder/composables/useVideoPlayer'
@@ -172,7 +214,8 @@ import {
 import {
   LinkIcon,
   MessageSquarePlusIcon,
-  Trash2Icon
+  Trash2Icon,
+  PencilIcon
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -183,6 +226,10 @@ const videoRef = ref<HTMLVideoElement | null>(null)
 const currentTime = ref(0)
 const showCommentDialog = ref(false)
 const newCommentText = ref('')
+const isEditingTitle = ref(false)
+const editedTitle = ref('')
+const titleInputRef = ref<HTMLInputElement | null>(null)
+const duration = ref(0)
 
 const {
   isLoading,
@@ -191,11 +238,16 @@ const {
   comments,
   transcription,
   shareLink,
+  title,
   fetchVideoData,
   addComment,
   deleteComment,
-  generateShareLink
+  generateShareLink,
+  updateTitle
 } = useVideoPlayer(route.params.videoId as string)
+
+// Update videoTitle to use the title from the backend
+const videoTitle = computed(() => title.value)
 
 // Add interfaces for our types
 interface Comment {
@@ -236,6 +288,7 @@ function seekTo(time: number) {
 }
 
 function formatTime(seconds: number): string {
+  if (!isFinite(seconds) || isNaN(seconds)) return '0:00'
   const minutes = Math.floor(seconds / 60)
   const remainingSeconds = Math.floor(seconds % 60)
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
@@ -299,14 +352,13 @@ async function copyShareLink() {
   }
 }
 
-// Update currentTranscript computed to include interim
+// Update currentTranscript computed to handle seconds
 const currentTranscript = computed(() => {
   if (!transcription.value) return null
   
-  const currentTimeMs = currentTime.value * 1000
   return transcription.value.find(t => 
-    currentTimeMs >= t.start_time && 
-    currentTimeMs <= t.end_time
+    currentTime.value >= t.start_time && 
+    currentTime.value < t.end_time
   ) as Transcript | null
 })
 
@@ -315,11 +367,122 @@ const sortedComments = computed((): Comment[] => {
   return [...comments.value].sort((a, b) => a.timestamp - b.timestamp)
 })
 
+// Add cleanup on component unmount
+onUnmounted(() => {
+  if (videoRef.value) {
+    videoRef.value.pause()
+    videoRef.value.src = ''
+    videoRef.value.load()
+  }
+})
+
+// Optimize video loading
+onMounted(() => {
+  if (videoRef.value) {
+    videoRef.value.addEventListener('loadedmetadata', () => {
+      // Set video buffer size to 2 minutes
+      if ('buffered' in videoRef.value!) {
+        const bufferSize = 120 // 2 minutes in seconds
+        videoRef.value!.preload = 'auto'
+        // @ts-ignore - mozPreservesPitch is a non-standard property
+        videoRef.value!.mozPreservesPitch = false
+        // @ts-ignore - webkitPreservesPitch is a non-standard property
+        videoRef.value!.webkitPreservesPitch = false
+      }
+    })
+  }
+})
+
 onMounted(async () => {
   await fetchVideoData()
 })
+
+function startEditingTitle() {
+  editedTitle.value = videoTitle.value
+  isEditingTitle.value = true
+  nextTick(() => {
+    titleInputRef.value?.focus()
+  })
+}
+
+async function saveVideoTitle() {
+  if (editedTitle.value.trim() !== videoTitle.value) {
+    try {
+      await updateTitle(editedTitle.value.trim())
+      toast({
+        title: 'Success',
+        description: 'Video title updated'
+      })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update video title',
+        variant: 'destructive'
+      })
+    }
+  }
+  isEditingTitle.value = false
+}
+
+function handleVideoLoaded(event: Event) {
+  const video = event.target as HTMLVideoElement
+  if (video) {
+    // Wait for duration to be available
+    if (isFinite(video.duration)) {
+      duration.value = video.duration
+    } else {
+      // If duration not immediately available, wait for loadeddata
+      video.addEventListener('loadeddata', () => {
+        duration.value = video.duration
+      }, { once: true })
+    }
+  }
+}
+
+// Add custom progress bar
+const progressBarRef = ref<HTMLDivElement | null>(null)
+
+function handleProgressBarClick(event: MouseEvent) {
+  if (!videoRef.value || !progressBarRef.value) return
+  
+  const rect = progressBarRef.value.getBoundingClientRect()
+  const clickPosition = event.clientX - rect.left
+  const percentage = clickPosition / rect.width
+  const newTime = percentage * videoRef.value.duration
+  
+  if (isFinite(newTime)) {
+    videoRef.value.currentTime = newTime
+  }
+}
 </script>
 
 <style scoped>
-/* ... existing styles ... */
+.video-player-page {
+  position: relative;
+}
+
+/* Make captions visible in fullscreen */
+.video-captions {
+  z-index: 2147483647; /* Maximum z-index value */
+}
+
+:deep(video::-webkit-media-text-track-container) {
+  transform: translateY(-40px);
+}
+
+/* Ensure captions are visible in fullscreen */
+:fullscreen .video-captions,
+::backdrop .video-captions {
+  position: fixed;
+  bottom: 60px;
+}
+
+/* Progress bar styles */
+.progress-bar {
+  transition: height 0.2s;
+}
+
+.group:hover .progress-bar {
+  height: 4px;
+}
 </style> 
