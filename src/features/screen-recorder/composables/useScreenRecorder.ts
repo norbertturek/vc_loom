@@ -206,10 +206,38 @@ export function useScreenRecorder() {
     }
   }
 
-  function stopRecording(): void {
-    if (mediaRecorder.value && state.value.isRecording) {
+  function stopRecording(): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      if (!mediaRecorder.value || !state.value.isRecording) {
+        reject(new Error('No active recording'))
+        return
+      }
+
+      mediaRecorder.value.onstop = () => {
+        try {
+          const blob = new Blob(recordedChunks.value, { type: FILE_DEFAULTS.mimeType })
+          if (state.value.recordedVideo) {
+            URL.revokeObjectURL(state.value.recordedVideo)
+          }
+          state.value.recordedVideo = URL.createObjectURL(blob)
+          state.value.isRecording = false
+          
+          // Stop all tracks except webcam
+          mediaRecorder.value?.stream.getTracks()
+            .filter(track => !webcamStream.value?.getTracks().includes(track))
+            .forEach(track => track.stop())
+          
+          recordedChunks.value = []
+          resolve(blob)
+        } catch (err) {
+          console.error('Error processing recording:', err)
+          state.value.error = 'Failed to process recording'
+          reject(err)
+        }
+      }
+
       mediaRecorder.value.stop()
-    }
+    })
   }
 
   function cleanup(): void {

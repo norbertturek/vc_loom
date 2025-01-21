@@ -30,7 +30,7 @@
         Start Recording
       </Button>
       <Button 
-        @click="stopRecording" 
+        @click="handleStopRecording" 
         :disabled="!isRecording"
         variant="secondary"
       >
@@ -42,6 +42,8 @@
       v-if="recordedVideo"
       :video-url="recordedVideo"
     />
+
+    <RecordingsList />
   </div>
 </template>
 
@@ -50,9 +52,11 @@ import { ref, onMounted, onUnmounted, toRefs } from 'vue'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, Loader2 } from 'lucide-vue-next'
 import { useScreenRecorder } from '../composables/useScreenRecorder'
+import { useRecordings } from '../composables/useRecordings'
 import RecordingSettings from './RecordingSettings.vue'
 import WebcamPreview from './WebcamPreview.vue'
 import RecordingPreview from './RecordingPreview.vue'
+import RecordingsList from './RecordingsList.vue'
 import ErrorAlert from './ErrorAlert.vue'
 
 const selectedWebcam = ref('')
@@ -72,6 +76,8 @@ const {
 } = useScreenRecorder()
 
 const { isRecording, recordedVideo, error, isLoading } = toRefs(state.value)
+
+const { uploadRecording, fetchRecordings } = useRecordings()
 
 async function handleDeviceSetup() {
   await getDevices()
@@ -95,6 +101,32 @@ async function startRecording() {
     selectedWebcam: selectedWebcam.value,
     selectedMicrophone: selectedMicrophone.value
   })
+}
+
+async function handleStopRecording() {
+  try {
+    state.value.isLoading = true
+    console.log('Stopping recording...')
+    const blob = await stopRecording()
+    console.log('Recording stopped, blob:', blob)
+    
+    if (blob) {
+      console.log('Blob size:', blob.size, 'bytes')
+      console.log('Blob type:', blob.type)
+      const title = `Screen Recording ${new Date().toLocaleString()}`
+      console.log('Uploading with title:', title)
+      await uploadRecording(blob, title)
+      await fetchRecordings()
+    } else {
+      console.error('No blob received from stopRecording')
+      state.value.error = 'Failed to get recording data'
+    }
+  } catch (err) {
+    console.error('Error handling recording:', err)
+    state.value.error = err instanceof Error ? err.message : 'Failed to save recording'
+  } finally {
+    state.value.isLoading = false
+  }
 }
 
 onMounted(() => {
