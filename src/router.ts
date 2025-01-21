@@ -11,7 +11,8 @@ const router = createRouter({
         {
           path: '',
           name: 'home',
-          component: () => import('@/pages/HomePage.vue')
+          component: () => import('@/pages/HomePage.vue'),
+          meta: { requiresGuest: true }
         },
         {
           path: 'login',
@@ -36,8 +37,19 @@ const router = createRouter({
           name: 'recorder',
           component: () => import('@/pages/RecorderPage.vue'),
           meta: { requiresAuth: true }
+        },
+        {
+          path: 'video/:videoId',
+          name: 'video',
+          component: () => import('@/pages/VideoPlayerPage.vue'),
+          meta: { requiresAuth: true }
         }
       ]
+    },
+    {
+      path: '/share/:videoId/:token',
+      name: 'shared-video',
+      component: () => import('@/pages/SharedVideoPage.vue')
     }
   ]
 })

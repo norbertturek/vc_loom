@@ -1,7 +1,7 @@
 {
   "name": "loom",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Screen recorder with webcam overlay and authentication",
   "type": "module",
   "scripts": {
@@ -20,6 +20,13 @@
     "supabase"
   ],
   "changelog": {
+    "0.3.0": [
+      "Added dedicated video player page",
+      "Implemented real-time transcription during recording",
+      "Added captions display during video playback",
+      "Fixed video freezing issues",
+      "Improved recording stability"
+    ],
     "0.2.0": [
       "Added authentication with Supabase",
       "Improved error handling",
@@ -36,6 +43,7 @@
     "@heroicons/vue": "^2.1.1",
     "@supabase/supabase-js": "^2.39.3",
     "@vercel/analytics": "^1.4.1",
+    "@vueuse/core": "^12.4.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "lucide-vue-next": "^0.314.0",

@@ -36,7 +36,10 @@
             class="w-full rounded-md"
             preload="metadata"
           />
-          <div class="mt-4 flex justify-end">
+          <div class="mt-4 flex justify-between items-center">
+            <Button variant="outline" @click="navigateToVideo(recording.id)">
+              Open Video
+            </Button>
             <a 
               :href="recording.url" 
               download
@@ -54,11 +57,13 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, Trash2, Download } from 'lucide-vue-next'
 import { useRecordings } from '../composables/useRecordings'
 
+const router = useRouter()
 const { state, fetchRecordings, deleteRecording } = useRecordings()
 
 onMounted(() => {
@@ -68,5 +73,9 @@ onMounted(() => {
 async function handleDelete(id: string) {
   await deleteRecording(id)
   await fetchRecordings()
+}
+
+function navigateToVideo(id: string) {
+  router.push(`/video/${id}`)
 }
 </script> 

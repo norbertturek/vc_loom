@@ -8,6 +8,47 @@ interface RecordingsState {
   error: string | null
 }
 
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+  isFinal: boolean;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onstart: () => void;
+  onend: () => void;
+  onerror: (event: { error: string }) => void;
+  start(): void;
+  stop(): void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
+}
+
 export function useRecordings() {
   const state = ref<RecordingsState>({
     recordings: [],
@@ -17,7 +58,54 @@ export function useRecordings() {
 
   const supabase = getSupabase()
 
-  async function uploadRecording(file: Blob, title: string) {
+  async function generateTranscription(recordingId: string, transcripts: Array<{
+    start_time: number,
+    end_time: number,
+    text: string
+  }>) {
+    try {
+      console.log('Saving transcripts for recording:', recordingId)
+      console.log('Transcripts:', transcripts)
+
+      if (transcripts.length === 0) {
+        console.log('No transcripts available for recording')
+        return
+      }
+
+      // Convert timestamps to milliseconds and add recording_id
+      const transcriptions = transcripts.map(t => ({
+        recording_id: recordingId,
+        start_time: t.start_time,
+        end_time: t.end_time,
+        text: t.text
+      }))
+
+      const { data, error: transcriptionError } = await supabase
+        .from('transcriptions')
+        .insert(transcriptions)
+        .select()
+
+      if (transcriptionError) {
+        console.error('Transcription error:', transcriptionError)
+        throw transcriptionError
+      }
+
+      console.log('Transcriptions saved successfully:', data)
+    } catch (err) {
+      console.error('Error saving transcriptions:', err)
+      throw err // Re-throw to handle in the caller
+    }
+  }
+
+  async function uploadRecording(
+    file: Blob, 
+    title: string,
+    transcripts: Array<{
+      start_time: number,
+      end_time: number,
+      text: string
+    }>
+  ): Promise<string> {
     try {
       state.value.loading = true
       state.value.error = null
@@ -61,7 +149,7 @@ export function useRecordings() {
           user_id: user.id,
           title,
           url: publicUrl,
-          duration: 0
+          duration: 60 // Default duration for now
         })
         .select()
         .single()
@@ -73,12 +161,18 @@ export function useRecordings() {
 
       console.log('Recording saved to database:', recordData)
 
+      // Generate transcription from the actual video content
+      await generateTranscription(recordData.id, transcripts)
+
       // Refresh recordings list
       await fetchRecordings()
+
+      // Return the recording ID
+      return recordData.id
     } catch (err) {
       console.error('Error uploading recording:', err)
       state.value.error = err instanceof Error ? err.message : 'Failed to upload recording'
-      throw err // Re-throw to handle in the component
+      throw err
     } finally {
       state.value.loading = false
     }
@@ -110,33 +204,47 @@ export function useRecordings() {
       state.value.loading = true
       state.value.error = null
 
-      // Get recording details
-      const { data: recording } = await supabase
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError) throw userError
+      if (!user) throw new Error('User not authenticated')
+
+      // Get recording details first
+      const { data: recording, error: fetchError } = await supabase
         .from('recordings')
-        .select('url')
+        .select('*')
         .eq('id', id)
         .single()
 
-      if (recording) {
-        // Delete from storage
-        const fileName = recording.url.split('/').pop()
-        if (fileName) {
-          await supabase.storage
-            .from('recordings')
-            .remove([fileName])
-        }
+      if (fetchError) throw fetchError
+      if (!recording) throw new Error('Recording not found')
+
+      // Extract filename from URL
+      const fileName = `${user.id}/${recording.url.split('/').pop()}`
+      console.log('Deleting file from storage:', fileName)
+
+      // Delete from storage first
+      const { error: storageError } = await supabase.storage
+        .from('recordings')
+        .remove([fileName])
+
+      if (storageError) {
+        console.error('Storage deletion error:', storageError)
+        throw storageError
       }
 
-      // Delete from database
-      const { error } = await supabase
+      // Then delete from database
+      const { error: dbError } = await supabase
         .from('recordings')
         .delete()
         .eq('id', id)
 
-      if (error) throw error
+      if (dbError) throw dbError
 
-      // Refresh recordings list
-      await fetchRecordings()
+      // Remove from local state
+      state.value.recordings = state.value.recordings.filter(r => r.id !== id)
+      
+      console.log('Recording deleted successfully')
     } catch (err) {
       console.error('Error deleting recording:', err)
       state.value.error = err instanceof Error ? err.message : 'Failed to delete recording'

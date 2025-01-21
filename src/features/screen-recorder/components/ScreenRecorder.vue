@@ -38,26 +38,21 @@
       </Button>
     </div>
 
-    <RecordingPreview
-      v-if="recordedVideo"
-      :video-url="recordedVideo"
-    />
-
     <RecordingsList />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, toRefs } from 'vue'
+import { ref, onMounted, onUnmounted, toRefs, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, Loader2 } from 'lucide-vue-next'
 import { useScreenRecorder } from '../composables/useScreenRecorder'
 import { useRecordings } from '../composables/useRecordings'
 import RecordingSettings from './RecordingSettings.vue'
 import WebcamPreview from './WebcamPreview.vue'
-import RecordingPreview from './RecordingPreview.vue'
 import RecordingsList from './RecordingsList.vue'
 import ErrorAlert from './ErrorAlert.vue'
+import { useRouter } from 'vue-router'
 
 const selectedWebcam = ref('')
 const selectedMicrophone = ref('')
@@ -78,6 +73,17 @@ const {
 const { isRecording, recordedVideo, error, isLoading } = toRefs(state.value)
 
 const { uploadRecording, fetchRecordings } = useRecordings()
+
+const router = useRouter()
+
+watch(includeWebcam, async (newValue) => {
+  if (newValue && selectedWebcam.value) {
+    await startWebcamPreview(selectedWebcam.value)
+  } else if (!newValue && webcamStream.value) {
+    webcamStream.value.getTracks().forEach(track => track.stop())
+    webcamStream.value = null
+  }
+})
 
 async function handleDeviceSetup() {
   await getDevices()
@@ -105,27 +111,14 @@ async function startRecording() {
 
 async function handleStopRecording() {
   try {
-    state.value.isLoading = true
-    console.log('Stopping recording...')
-    const blob = await stopRecording()
-    console.log('Recording stopped, blob:', blob)
+    const { blob, transcripts } = await stopRecording()
+    const title = `Recording ${new Date().toLocaleString()}`
+    const recordingId = await uploadRecording(blob, title, transcripts)
     
-    if (blob) {
-      console.log('Blob size:', blob.size, 'bytes')
-      console.log('Blob type:', blob.type)
-      const title = `Screen Recording ${new Date().toLocaleString()}`
-      console.log('Uploading with title:', title)
-      await uploadRecording(blob, title)
-      await fetchRecordings()
-    } else {
-      console.error('No blob received from stopRecording')
-      state.value.error = 'Failed to get recording data'
-    }
+    // Navigate to video player
+    router.push(`/video/${recordingId}`)
   } catch (err) {
-    console.error('Error handling recording:', err)
-    state.value.error = err instanceof Error ? err.message : 'Failed to save recording'
-  } finally {
-    state.value.isLoading = false
+    console.error('Error stopping recording:', err)
   }
 }
 
